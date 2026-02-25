@@ -273,6 +273,16 @@ function cleanJsonInput(rawJson: string): string {
     .replace(/:\s*(-?\d+),(\d+)(?=\s*[,}\]])/g, ": $1.$2");
 }
 
+function sanitizeExplanationText(rawText: string): string {
+  return rawText
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function classifyMetric(
   value: number | null,
   thresholds: { low: number; high: number },
@@ -361,6 +371,8 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [useJsonMode, setUseJsonMode] = useState(false);
   const [explanation, setExplanation] = useState("");
+  const [typedExplanation, setTypedExplanation] = useState("");
+  const [isTypingExplanation, setIsTypingExplanation] = useState(false);
   const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
   const [jsonFeedback, setJsonFeedback] = useState("");
 
@@ -439,6 +451,32 @@ export default function Home() {
     }
     return "Priorite: lancer un scenario d'optimisation puis comparer energie et CO2.";
   }, [topLevers]);
+
+  useEffect(() => {
+    if (!explanation) {
+      setTypedExplanation("");
+      setIsTypingExplanation(false);
+      return;
+    }
+
+    setTypedExplanation("");
+    setIsTypingExplanation(true);
+
+    let index = 0;
+    const step = 2;
+    const intervalId = window.setInterval(() => {
+      index += step;
+      if (index >= explanation.length) {
+        setTypedExplanation(explanation);
+        setIsTypingExplanation(false);
+        window.clearInterval(intervalId);
+        return;
+      }
+      setTypedExplanation(explanation.slice(0, index));
+    }, 12);
+
+    return () => window.clearInterval(intervalId);
+  }, [explanation]);
 
   useEffect(() => {
     const sections = navItems
@@ -689,6 +727,8 @@ export default function Home() {
     }
 
     setError("");
+    setExplanation("");
+    setTypedExplanation("");
     setIsLoadingExplanation(true);
 
     try {
@@ -712,7 +752,9 @@ export default function Home() {
         throw new Error(data.error ?? `Echec explication (${response.status})`);
       }
 
-      setExplanation(data.explanation?.trim() ?? "Explication indisponible.");
+      setExplanation(
+        sanitizeExplanationText(data.explanation?.trim() ?? "Explication indisponible."),
+      );
     } catch (requestError) {
       const message =
         requestError instanceof Error ? requestError.message : "Erreur d'explication.";
@@ -1084,8 +1126,9 @@ export default function Home() {
                       <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">
                         Interpretation IA
                       </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--ink-700)]">
-                        {explanation}
+                      <p className="mt-2 whitespace-pre-line text-base leading-8 font-semibold text-black">
+                        {typedExplanation}
+                        {isTypingExplanation ? <span className="animate-pulse">|</span> : null}
                       </p>
                     </article>
                   )}
