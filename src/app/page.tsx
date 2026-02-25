@@ -19,12 +19,12 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { id: "overview", label: "Overview", caption: "Platform summary" },
-  { id: "predictor", label: "Predictor Lab", caption: "Run real predictions" },
-  { id: "insights", label: "Model Insights", caption: "Performance metrics" },
-  { id: "workflow", label: "Workflow", caption: "How it works" },
-  { id: "api", label: "API", caption: "Endpoints and examples" },
-  { id: "faq", label: "FAQ", caption: "Answers and guidance" },
+  { id: "overview", label: "Aperçu", caption: "Résumé de la plateforme" },
+  { id: "predictor", label: "Laboratoire de prédiction", caption: "Effectuez des prédictions réelles" },
+  { id: "insights", label: "Aperçu du modèle", caption: "Indicateurs de performance" },
+  { id: "workflow", label: "Flux de travail", caption: "Comment ça marche" },
+  { id: "api", label: "API", caption: "Points d'accès et exemples" },
+  { id: "faq", label: "FAQ", caption: "Réponses et conseils" },
 ];
 
 const defaultPayload = {
@@ -118,7 +118,7 @@ const faqItems = [
 ];
 
 function formatNumber(value: number, maximumFractionDigits: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("fr-FR", {
     maximumFractionDigits,
   }).format(value);
 }
@@ -344,7 +344,7 @@ export default function Home() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="surface-panel sticky top-3 z-30 flex items-center justify-between gap-3 px-4 py-3 md:px-6">
+          <header className="surface-panel z-20 flex items-center justify-between gap-3 px-4 py-3 md:px-6">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -358,7 +358,7 @@ export default function Home() {
                   Active section
                 </p>
                 <p className="text-sm font-semibold text-[var(--ink-900)]">
-                  {navItems.find((item) => item.id === activeSection)?.label ?? "Overview"}
+                  {navItems.find((item) => item.id === activeSection)?.label ?? "Aperçu"}
                 </p>
               </div>
             </div>
@@ -371,14 +371,14 @@ export default function Home() {
           </header>
 
           <main className="mt-4 space-y-4 md:space-y-5">
-            <section id="overview" className="surface-panel section-reveal scroll-mt-28 p-5 md:p-7">
+            <section id="overview" className="surface-panel section-reveal scroll-mt-24 p-5 md:p-7">
               <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                 <div>
                   <p className="text-xs uppercase tracking-[0.24em] text-[var(--ink-500)]">
                     Sustainable Intelligence
                   </p>
-                  <h1 className="mt-2 max-w-2xl text-4xl leading-tight font-semibold md:text-5xl">
-                    Professional dashboard for energy and carbon forecasts
+                  <h1 className="mt-2 max-w-2xl text-3xl leading-tight font-semibold md:text-5xl">
+                    Plateforme professionnelle de prévision énergétique et carbone
                   </h1>
                   <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--ink-700)] md:text-base">
                     EnergiSight connects your building profile to production ML models and returns
@@ -456,7 +456,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section id="predictor" className="surface-panel section-reveal scroll-mt-28 p-5 md:p-7">
+            <section id="predictor" className="surface-panel section-reveal scroll-mt-24 p-5 md:p-7">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-[var(--ink-500)]">
@@ -555,14 +555,14 @@ export default function Home() {
                   <textarea
                     value={payloadText}
                     onChange={(event) => setPayloadText(event.target.value)}
-                    className="mt-3 h-[540px] w-full resize-y rounded-xl border border-[var(--line)] bg-white p-3 font-mono text-xs leading-6 text-[var(--ink-900)] outline-none transition focus:border-[var(--accent)]"
+                    className="mt-3 h-[460px] w-full resize-y rounded-xl border border-[var(--line)] bg-white p-3 font-mono text-xs leading-6 text-[var(--ink-900)] outline-none transition focus:border-[var(--accent)]"
                     spellCheck={false}
                   />
                 </article>
               </div>
             </section>
 
-            <section id="insights" className="surface-panel section-reveal scroll-mt-28 p-5 md:p-7">
+            <section id="insights" className="surface-panel section-reveal scroll-mt-24 p-5 md:p-7">
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--ink-500)]">Model Insights</p>
               <h2 className="mt-1 text-2xl font-semibold md:text-3xl">
                 Validation summary from final training run
@@ -597,7 +597,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section id="workflow" className="surface-panel section-reveal scroll-mt-28 p-5 md:p-7">
+            <section id="workflow" className="surface-panel section-reveal scroll-mt-24 p-5 md:p-7">
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--ink-500)]">Workflow</p>
               <h2 className="mt-1 text-2xl font-semibold md:text-3xl">
                 Typical operational flow in four steps
@@ -616,7 +616,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section id="api" className="surface-panel section-reveal scroll-mt-28 p-5 md:p-7">
+            <section id="api" className="surface-panel section-reveal scroll-mt-24 p-5 md:p-7">
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--ink-500)]">API</p>
               <h2 className="mt-1 text-2xl font-semibold md:text-3xl">Endpoint map and request snippet</h2>
 
@@ -659,7 +659,7 @@ export default function Home() {
               </div>
             </section>
 
-            <section id="faq" className="surface-panel section-reveal scroll-mt-28 p-5 md:p-7">
+            <section id="faq" className="surface-panel section-reveal scroll-mt-24 p-5 md:p-7">
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--ink-500)]">FAQ</p>
               <h2 className="mt-1 text-2xl font-semibold md:text-3xl">Common deployment and usage questions</h2>
 

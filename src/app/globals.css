@@ -4,14 +4,14 @@
   --ink-900: #0f1b2b;
   --ink-700: #2c3d54;
   --ink-500: #5d7087;
-  --paper: #edf4f8;
-  --card: rgba(255, 255, 255, 0.86);
+  --paper: #eef3f6;
+  --card: #f8fafc;
   --line: rgba(14, 26, 40, 0.14);
   --accent: #007568;
   --accent-strong: #005c52;
   --warn: #b65a2f;
   --good: #16733b;
-  --shadow: 0 20px 45px rgba(12, 20, 32, 0.09);
+  --shadow: 0 8px 22px rgba(12, 20, 32, 0.08);
 }
 
 @theme inline {
@@ -31,10 +31,7 @@ body {
 body {
   margin: 0;
   color: var(--ink-900);
-  background:
-    radial-gradient(circle at 95% -10%, rgba(0, 117, 104, 0.25), transparent 42%),
-    radial-gradient(circle at 0% 100%, rgba(182, 90, 47, 0.2), transparent 45%),
-    linear-gradient(180deg, #eff7fb 0%, #e9f1f6 100%);
+  background: linear-gradient(180deg, #eef4f7 0%, #e9f0f5 100%);
   font-family: var(--font-body), monospace;
   position: relative;
 }
@@ -44,11 +41,9 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
-  background-size: 44px 44px;
-  opacity: 0.45;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px);
+  background-size: 100% 38px;
+  opacity: 0.2;
   z-index: -1;
 }
 
@@ -58,24 +53,22 @@ body::before {
 
 .surface-panel {
   border: 1px solid var(--line);
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--card);
-  backdrop-filter: blur(12px);
   box-shadow: var(--shadow);
 }
 
 .surface-subtle {
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
-  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  background: #ffffff;
 }
 
 .nav-item {
   width: 100%;
   text-align: left;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 0.65rem 0.75rem;
   transition: all 0.2s ease;
 }
@@ -87,13 +80,13 @@ body::before {
 
 .nav-item-active {
   border-color: rgba(0, 117, 104, 0.3);
-  background: rgba(0, 117, 104, 0.12);
+  background: rgba(0, 117, 104, 0.1);
 }
 
 .chip-neutral {
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
+  background: #ffffff;
   padding: 0.3rem 0.55rem;
   color: var(--ink-700);
   font-weight: 600;
@@ -113,8 +106,8 @@ body::before {
 
 .metric-card {
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 12px;
+  background: #ffffff;
   padding: 0.9rem 1rem;
 }
 
@@ -129,7 +122,7 @@ body::before {
   margin-top: 0.4rem;
   color: var(--ink-900);
   font-family: var(--font-heading), sans-serif;
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -141,7 +134,7 @@ body::before {
 }
 
 .section-reveal {
-  animation: riseIn 0.55s ease both;
+  animation: none;
 }
 
 @keyframes riseIn {
