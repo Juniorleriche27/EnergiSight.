@@ -30,6 +30,11 @@ type FieldGroup = {
   fields: string[];
 };
 
+type ValidationNote = {
+  level: "warning" | "error";
+  message: string;
+};
+
 const navItems: NavItem[] = [
   { id: "overview", label: "Apercu", caption: "Resume de la plateforme" },
   { id: "predictor", label: "Laboratoire de prediction", caption: "Previsions en direct" },
@@ -104,6 +109,18 @@ const fieldLabels: Record<string, string> = {
   ComplianceStatus: "Etat de conformite",
 };
 
+const fieldUnits: Record<string, string> = {
+  Latitude: "deg",
+  Longitude: "deg",
+  PropertyGFATotal: "m2",
+  PropertyGFAParking: "m2",
+  LargestPropertyUseTypeGFA: "m2",
+  SecondLargestPropertyUseTypeGFA: "m2",
+  BuildingAge: "ans",
+  GFA_per_floor: "m2/etage",
+  ENERGYSTARScore: "/100",
+};
+
 const selectOptions: Record<string, string[]> = {
   BuildingType: ["NonResidential", "MultifamilyMR", "Campus"],
   PrimaryPropertyType: ["Office", "Hotel", "School", "Retail Store", "Other"],
@@ -145,6 +162,38 @@ const fieldGroups: FieldGroup[] = [
     ],
   },
 ];
+
+const scenarioPresets: Record<string, Record<string, string | number | null>> = {
+  Bureau: {
+    ...defaultPayload,
+    PrimaryPropertyType: "Office",
+    LargestPropertyUseType: "Office",
+    ENERGYSTARScore: 72,
+    BuildingAge: 28,
+  },
+  Ecole: {
+    ...defaultPayload,
+    PrimaryPropertyType: "School",
+    LargestPropertyUseType: "School",
+    BuildingType: "Campus",
+    NumberofFloors: 4,
+    ENERGYSTARScore: 64,
+    BuildingAge: 35,
+    PropertyGFATotal: 95000,
+    PropertyGFAParking: 9000,
+  },
+  Hopital: {
+    ...defaultPayload,
+    PrimaryPropertyType: "Other",
+    LargestPropertyUseType: "Hotel",
+    BuildingType: "NonResidential",
+    NumberofFloors: 9,
+    ENERGYSTARScore: 58,
+    BuildingAge: 32,
+    PropertyGFATotal: 230000,
+    PropertyGFAParking: 18000,
+  },
+};
 
 const workflowSteps = [
   {
@@ -200,6 +249,104 @@ function formatNumber(value: number, maximumFractionDigits: number): string {
   }).format(value);
 }
 
+function parseNumber(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const cleaned = value.trim();
+  if (!cleaned) {
+    return null;
+  }
+
+  const numeric = Number(cleaned.replace(",", "."));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function cleanJsonInput(rawJson: string): string {
+  return rawJson
+    .replace(/[\u201c\u201d]/g, "\"")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/,\s*([}\]])/g, "$1")
+    .replace(/:\s*(-?\d+),(\d+)(?=\s*[,}\]])/g, ": $1.$2");
+}
+
+function classifyMetric(
+  value: number | null,
+  thresholds: { low: number; high: number },
+): "faible" | "moyenne" | "elevee" | "indisponible" {
+  if (value === null || Number.isNaN(value)) {
+    return "indisponible";
+  }
+
+  if (value < thresholds.low) {
+    return "faible";
+  }
+
+  if (value <= thresholds.high) {
+    return "moyenne";
+  }
+
+  return "elevee";
+}
+
+function buildValidationNotes(formData: FormDataMap): ValidationNote[] {
+  const notes: ValidationNote[] = [];
+  const total = parseNumber(formData.PropertyGFATotal);
+  const parking = parseNumber(formData.PropertyGFAParking);
+  const floors = parseNumber(formData.NumberofFloors);
+  const buildings = parseNumber(formData.NumberofBuildings);
+  const energyStar = parseNumber(formData.ENERGYSTARScore);
+  const age = parseNumber(formData.BuildingAge);
+  const gfaPerFloor = parseNumber(formData.GFA_per_floor);
+
+  if (total !== null && parking !== null && parking > total) {
+    notes.push({
+      level: "error",
+      message: "Surface parking superieure a la surface totale.",
+    });
+  }
+
+  if (floors !== null && floors <= 0) {
+    notes.push({
+      level: "error",
+      message: "Le nombre d'etages doit etre superieur a 0.",
+    });
+  }
+
+  if (buildings !== null && buildings <= 0) {
+    notes.push({
+      level: "error",
+      message: "Le nombre de batiments doit etre superieur a 0.",
+    });
+  }
+
+  if (energyStar !== null && (energyStar < 0 || energyStar > 100)) {
+    notes.push({
+      level: "warning",
+      message: "Score ENERGY STAR atypique (valeur attendue entre 0 et 100).",
+    });
+  }
+
+  if (age !== null && age > 120) {
+    notes.push({
+      level: "warning",
+      message: "Age du batiment atypique (> 120 ans).",
+    });
+  }
+
+  if (total !== null && gfaPerFloor !== null && gfaPerFloor > total) {
+    notes.push({
+      level: "warning",
+      message: "Surface moyenne par etage superieure a la surface totale.",
+    });
+  }
+
+  return notes;
+}
+
 export default function Home() {
   const apiBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -215,8 +362,83 @@ export default function Home() {
   const [useJsonMode, setUseJsonMode] = useState(false);
   const [explanation, setExplanation] = useState("");
   const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
+  const [jsonFeedback, setJsonFeedback] = useState("");
 
   const hasApiBase = useMemo(() => apiBaseUrl.length > 0, [apiBaseUrl]);
+  const validationNotes = useMemo(() => buildValidationNotes(formData), [formData]);
+  const hasBlockingValidation = useMemo(
+    () => validationNotes.some((note) => note.level === "error"),
+    [validationNotes],
+  );
+  const energyLevel = useMemo(
+    () => classifyMetric(result?.energy_kbtu ?? null, { low: 3000000, high: 9000000 }),
+    [result],
+  );
+  const co2Level = useMemo(
+    () => classifyMetric(result?.co2_tons ?? null, { low: 120, high: 350 }),
+    [result],
+  );
+  const complianceSummary = useMemo(() => {
+    const complianceValue = (formData.ComplianceStatus ?? "").toLowerCase();
+    if (!complianceValue) {
+      return "Non renseigne";
+    }
+    if (complianceValue.includes("non-compliant")) {
+      return "Non conforme";
+    }
+    if (complianceValue.includes("error")) {
+      return "A verifier";
+    }
+    return "Conforme";
+  }, [formData.ComplianceStatus]);
+
+  const topLevers = useMemo(() => {
+    const levers: string[] = [];
+    const parking = parseNumber(formData.PropertyGFAParking);
+    const total = parseNumber(formData.PropertyGFATotal);
+    const age = parseNumber(formData.BuildingAge);
+    const score = parseNumber(formData.ENERGYSTARScore);
+
+    if (total !== null && total > 0 && parking !== null && parking / total > 0.2) {
+      levers.push("Surface parking elevee");
+    }
+
+    if (age !== null && age >= 30) {
+      levers.push("Batiment ancien");
+    }
+
+    if (score !== null && score < 70) {
+      levers.push("Score ENERGY STAR perfectible");
+    }
+
+    if (levers.length < 3) {
+      const floors = parseNumber(formData.NumberofFloors);
+      if (floors !== null && floors > 20) {
+        levers.push("Immeuble grande hauteur");
+      }
+    }
+
+    if (levers.length < 3) {
+      levers.push("Profil d'usage principal a optimiser");
+    }
+
+    return levers.slice(0, 3);
+  }, [
+    formData.BuildingAge,
+    formData.ENERGYSTARScore,
+    formData.NumberofFloors,
+    formData.PropertyGFAParking,
+    formData.PropertyGFATotal,
+  ]);
+  const nextAction = useMemo(() => {
+    if (topLevers.some((lever) => lever.includes("ENERGY STAR"))) {
+      return "Priorite: audit HVAC + eclairage et suivi des consignes d'exploitation.";
+    }
+    if (topLevers.some((lever) => lever.includes("parking"))) {
+      return "Priorite: analyser l'usage des surfaces annexes et l'intensite energetique.";
+    }
+    return "Priorite: lancer un scenario d'optimisation puis comparer energie et CO2.";
+  }, [topLevers]);
 
   useEffect(() => {
     const sections = navItems
@@ -260,6 +482,7 @@ export default function Home() {
   }
 
   function handleFieldChange(field: string, value: string) {
+    setJsonFeedback("");
     setFormData((previous) => {
       const updated = { ...previous, [field]: value };
       const payloadFromUpdated = requiredFeatures.reduce<Record<string, string | number | null>>(
@@ -328,6 +551,7 @@ export default function Home() {
       setFormAndJson(completePayload);
       setResult(null);
       setExplanation("");
+      setJsonFeedback("Echantillon charge dans le formulaire.");
     } catch (requestError) {
       const message =
         requestError instanceof Error ? requestError.message : "Erreur de chargement.";
@@ -344,24 +568,62 @@ export default function Home() {
     setExplanation("");
     setError("");
     setUseJsonMode(false);
+    setJsonFeedback("Formulaire reinitialise.");
   }
 
   function applyJsonToForm() {
     try {
-      const parsed = JSON.parse(payloadText) as Record<string, string | number | null>;
-      const featureList = requiredFeatures.length ? requiredFeatures : Object.keys(defaultPayload);
-      const normalized = featureList.reduce<Record<string, string | number | null>>(
+      const sanitized = cleanJsonInput(payloadText);
+      const parsed = JSON.parse(sanitized) as Record<string, string | number | null>;
+
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Format JSON non supporte.");
+      }
+
+      const knownFeatures = Array.from(new Set([...Object.keys(defaultPayload), ...requiredFeatures]));
+      const normalized = knownFeatures.reduce<Record<string, string | number | null>>(
         (accumulator, feature) => {
           accumulator[feature] = parsed[feature] ?? null;
           return accumulator;
         },
         {},
       );
-      setFormAndJson(normalized);
+
+      const appliedFields = knownFeatures.filter((feature) => Object.prototype.hasOwnProperty.call(parsed, feature));
+      setRequiredFeatures(knownFeatures);
+      setFormData(toStringMap(normalized));
+      setPayloadText(JSON.stringify(normalized, null, 2));
+      setUseJsonMode(false);
       setError("");
-    } catch {
-      setError("JSON invalide. Verifiez la syntaxe avant d'appliquer.");
+      setJsonFeedback(
+        `JSON applique avec succes (${appliedFields.length} champ${appliedFields.length > 1 ? "s" : ""} mis a jour).`,
+      );
+    } catch (jsonError) {
+      const message =
+        jsonError instanceof Error ? jsonError.message : "JSON invalide. Verifiez la syntaxe.";
+      setError(`JSON invalide. ${message}`);
+      setJsonFeedback("");
     }
+  }
+
+  function applyPreset(presetName: string) {
+    const preset = scenarioPresets[presetName];
+    if (!preset) {
+      return;
+    }
+    setRequiredFeatures(Object.keys(defaultPayload));
+    setFormAndJson(preset);
+    setResult(null);
+    setExplanation("");
+    setError("");
+    setJsonFeedback(`Scenario ${presetName.toLowerCase()} applique.`);
+  }
+
+  function syncJsonFromForm() {
+    const payload = buildPayloadFromForm();
+    setPayloadText(JSON.stringify(payload, null, 2));
+    setJsonFeedback("JSON synchronise depuis le formulaire.");
+    setError("");
   }
 
   function getCurrentPayload() {
@@ -370,7 +632,7 @@ export default function Home() {
     }
 
     try {
-      return JSON.parse(payloadText) as Record<string, string | number | null>;
+      return JSON.parse(cleanJsonInput(payloadText)) as Record<string, string | number | null>;
     } catch {
       throw new Error("JSON invalide: impossible de generer la charge utile.");
     }
@@ -379,6 +641,11 @@ export default function Home() {
   async function predictBoth() {
     if (!hasApiBase) {
       setError("Variable NEXT_PUBLIC_API_BASE_URL manquante.");
+      return;
+    }
+
+    if (hasBlockingValidation) {
+      setError("Corrigez les erreurs de saisie avant de lancer la prediction.");
       return;
     }
 
@@ -579,12 +846,38 @@ export default function Home() {
 
                 <article className="surface-subtle p-4 md:p-5">
                   <h2 className="text-xs uppercase tracking-[0.2em] text-[var(--ink-500)]">
-                    Vue metier
+                    Resume decisionnel
                   </h2>
-                  <p className="mt-3 text-sm leading-7 text-[var(--ink-700)]">
-                    Cette interface presente uniquement les informations utiles a la decision. Les
-                    details techniques API sont masques pour une lecture claire en soutenance.
-                  </p>
+                  <div className="mt-3 grid gap-2">
+                    <div className="rounded-lg border border-[var(--line)] bg-white p-3">
+                      <p className="text-xs uppercase tracking-[0.15em] text-[var(--ink-500)]">Statut global</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--ink-900)]">
+                        {complianceSummary} | {hasApiBase ? "Systeme operationnel" : "Backend a configurer"}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-[var(--line)] bg-white p-3">
+                      <p className="text-xs uppercase tracking-[0.15em] text-[var(--ink-500)]">Energie prevue</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--ink-900)]">
+                        {result ? `${formatNumber(result.energy_kbtu, 0)} kBtu` : "En attente"} ({energyLevel})
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-[var(--line)] bg-white p-3">
+                      <p className="text-xs uppercase tracking-[0.15em] text-[var(--ink-500)]">CO2 prevu</p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--ink-900)]">
+                        {result ? `${formatNumber(result.co2_tons, 2)} tonnes` : "En attente"} ({co2Level})
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-lg border border-[var(--line)] bg-white p-3">
+                    <p className="text-xs uppercase tracking-[0.15em] text-[var(--ink-500)]">Top 3 leviers</p>
+                    <ul className="mt-2 space-y-1 text-sm text-[var(--ink-700)]">
+                      {topLevers.map((lever) => (
+                        <li key={lever}>- {lever}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-sm font-semibold text-[var(--ink-900)]">Action immediate: {nextAction}</p>
+                  </div>
                 </article>
               </div>
 
@@ -602,14 +895,14 @@ export default function Home() {
                   <p className="metric-unit">tonnes</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Fonctionnalites requises</p>
+                  <p className="metric-label">Variables utilisees</p>
                   <p className="metric-value">{requiredFeatures.length}</p>
-                  <p className="metric-unit">entrees du modele</p>
+                  <p className="metric-unit">entrees modele</p>
                 </article>
                 <article className="metric-card">
                   <p className="metric-label">Etat de l&apos;API</p>
                   <p className="metric-value">{hasApiBase ? "Pret" : "A configurer"}</p>
-                  <p className="metric-unit">URL de base</p>
+                  <p className="metric-unit">connectivite backend</p>
                 </article>
               </div>
             </section>
@@ -641,7 +934,7 @@ export default function Home() {
                     <button
                       type="button"
                       onClick={predictBoth}
-                      disabled={isLoadingPrediction}
+                      disabled={isLoadingPrediction || hasBlockingValidation}
                       className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink-900)] transition hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isLoadingPrediction ? "Prediction..." : "Predire les deux"}
@@ -655,25 +948,77 @@ export default function Home() {
                     </button>
                   </div>
 
+                  <div className="mt-3">
+                    <p className="text-xs uppercase tracking-[0.15em] text-[var(--ink-500)]">
+                      Remplissage rapide
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {Object.keys(scenarioPresets).map((presetName) => (
+                        <button
+                          key={presetName}
+                          type="button"
+                          onClick={() => applyPreset(presetName)}
+                          className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink-700)] transition hover:border-[var(--accent)] hover:text-[var(--ink-900)]"
+                        >
+                          Exemple {presetName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {error && (
                     <div className="mt-4 rounded-lg border border-[var(--warn)] bg-orange-50 p-3 text-sm text-[var(--warn)]">
                       {error}
                     </div>
                   )}
 
+                  {jsonFeedback && !error && (
+                    <div className="mt-3 rounded-lg border border-[var(--good)] bg-emerald-50 p-3 text-sm text-[var(--good)]">
+                      {jsonFeedback}
+                    </div>
+                  )}
+
+                  {validationNotes.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-[var(--line)] bg-white p-3">
+                      <p className="text-xs uppercase tracking-[0.15em] text-[var(--ink-500)]">
+                        Controle de saisie
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {validationNotes.map((note, index) => (
+                          <p
+                            key={`${note.level}-${index}`}
+                            className={`text-xs ${note.level === "error" ? "text-[var(--warn)]" : "text-[var(--ink-700)]"}`}
+                          >
+                            {note.level === "error" ? "Erreur" : "Avertissement"}: {note.message}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-4 grid gap-4">
                     {fieldGroups.map((group) => (
-                      <fieldset key={group.title} className="rounded-xl border border-[var(--line)] bg-white p-3">
-                        <legend className="px-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-500)]">
+                      <details
+                        key={group.title}
+                        className="rounded-xl border border-[var(--line)] bg-white p-3"
+                      >
+                        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ink-500)]">
                           {group.title}
-                        </legend>
-                        <div className="grid gap-2 md:grid-cols-2">
+                        </summary>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
                           {group.fields.map((field) => {
                             const isSelect = Array.isArray(selectOptions[field]);
                             const step = field === "Latitude" || field === "Longitude" ? "0.0001" : "1";
                             return (
                               <label key={field} className="space-y-1">
-                                <span className="text-xs text-[var(--ink-700)]">{fieldLabels[field] ?? field}</span>
+                                <span className="text-xs text-[var(--ink-700)]">
+                                  {fieldLabels[field] ?? field}
+                                  {fieldUnits[field] ? (
+                                    <span className="ml-1 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-500)]">
+                                      ({fieldUnits[field]})
+                                    </span>
+                                  ) : null}
+                                </span>
                                 {isSelect ? (
                                   <select
                                     value={formData[field] ?? ""}
@@ -700,7 +1045,7 @@ export default function Home() {
                             );
                           })}
                         </div>
-                      </fieldset>
+                      </details>
                     ))}
                   </div>
                 </article>
@@ -758,19 +1103,32 @@ export default function Home() {
                         />
                         Utiliser le JSON pour l&apos;envoi
                       </label>
+                      <p className="text-xs text-[var(--ink-500)]">
+                        Vous pouvez coller un JSON avec virgules finales ou commentaires. Le bouton
+                        d&apos;application nettoie automatiquement la syntaxe supportee.
+                      </p>
                       <textarea
                         value={payloadText}
                         onChange={(event) => setPayloadText(event.target.value)}
                         className="h-[290px] w-full resize-y rounded-xl border border-[var(--line)] bg-[#0f1823] p-3 font-mono text-xs leading-6 text-[#d5ecff] outline-none"
                         spellCheck={false}
                       />
-                      <button
-                        type="button"
-                        onClick={applyJsonToForm}
-                        className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink-900)] transition hover:border-[var(--accent)]"
-                      >
-                        Appliquer le JSON au formulaire
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={applyJsonToForm}
+                          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink-900)] transition hover:border-[var(--accent)]"
+                        >
+                          Appliquer le JSON au formulaire
+                        </button>
+                        <button
+                          type="button"
+                          onClick={syncJsonFromForm}
+                          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink-700)] transition hover:border-[var(--ink-500)]"
+                        >
+                          Synchroniser depuis le formulaire
+                        </button>
+                      </div>
                     </div>
                   </details>
                 </article>
