@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --ink-900: #101721;
+  --ink-700: #2b3645;
+  --ink-500: #4f6074;
+  --paper: #f5f9fc;
+  --card: rgba(255, 255, 255, 0.84);
+  --line: rgba(16, 23, 33, 0.12);
+  --accent: #007c77;
+  --accent-strong: #005d59;
+  --warn: #c25b2d;
+  --good: #137f3d;
+}
+
+@theme inline {
+  --font-sans: var(--font-heading);
+  --font-mono: var(--font-body);
+}
+
+body {
+  color: var(--ink-900);
+  background:
+    radial-gradient(circle at 90% -10%, rgba(0, 124, 119, 0.25), transparent 45%),
+    radial-gradient(circle at -10% 110%, rgba(194, 91, 45, 0.18), transparent 42%),
+    var(--paper);
+  font-family: var(--font-body), monospace;
+}
+
+.fade-up {
+  animation: fadeUp 0.55s ease both;
+}
+
+.fade-up-slow {
+  animation: fadeUp 0.8s ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
