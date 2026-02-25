@@ -12,6 +12,11 @@ type PredictionResponse = {
   co2_tons: number;
 };
 
+type ExplainResponse = {
+  explanation?: string;
+  error?: string;
+};
+
 type NavItem = {
   id: string;
   label: string;
@@ -208,6 +213,8 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState("overview");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [useJsonMode, setUseJsonMode] = useState(false);
+  const [explanation, setExplanation] = useState("");
+  const [isLoadingExplanation, setIsLoadingExplanation] = useState(false);
 
   const hasApiBase = useMemo(() => apiBaseUrl.length > 0, [apiBaseUrl]);
 
@@ -320,6 +327,7 @@ export default function Home() {
 
       setFormAndJson(completePayload);
       setResult(null);
+      setExplanation("");
     } catch (requestError) {
       const message =
         requestError instanceof Error ? requestError.message : "Erreur de chargement.";
@@ -333,6 +341,7 @@ export default function Home() {
     setRequiredFeatures(Object.keys(defaultPayload));
     setFormAndJson(defaultPayload);
     setResult(null);
+    setExplanation("");
     setError("");
     setUseJsonMode(false);
   }
@@ -355,6 +364,18 @@ export default function Home() {
     }
   }
 
+  function getCurrentPayload() {
+    if (!useJsonMode) {
+      return buildPayloadFromForm();
+    }
+
+    try {
+      return JSON.parse(payloadText) as Record<string, string | number | null>;
+    } catch {
+      throw new Error("JSON invalide: impossible de generer la charge utile.");
+    }
+  }
+
   async function predictBoth() {
     if (!hasApiBase) {
       setError("Variable NEXT_PUBLIC_API_BASE_URL manquante.");
@@ -363,12 +384,11 @@ export default function Home() {
 
     setError("");
     setResult(null);
+    setExplanation("");
     setIsLoadingPrediction(true);
 
     try {
-      const payload = useJsonMode
-        ? (JSON.parse(payloadText) as Record<string, string | number | null>)
-        : buildPayloadFromForm();
+      const payload = getCurrentPayload();
 
       const response = await fetch(`${apiBaseUrl}/predict/both`, {
         method: "POST",
@@ -392,6 +412,46 @@ export default function Home() {
       setError(message);
     } finally {
       setIsLoadingPrediction(false);
+    }
+  }
+
+  async function explainPrediction() {
+    if (!result) {
+      setError("Lancez d'abord une prediction pour obtenir une explication.");
+      return;
+    }
+
+    setError("");
+    setIsLoadingExplanation(true);
+
+    try {
+      const payload = getCurrentPayload();
+
+      const response = await fetch("/api/explain", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          prediction: result,
+          payload,
+        }),
+      });
+
+      const data = (await response.json()) as ExplainResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error ?? `Echec explication (${response.status})`);
+      }
+
+      setExplanation(data.explanation?.trim() ?? "Explication indisponible.");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error ? requestError.message : "Erreur d'explication.";
+      setError(message);
+    } finally {
+      setIsLoadingExplanation(false);
     }
   }
 
@@ -662,6 +722,28 @@ export default function Home() {
                       <p className="text-xs text-[var(--ink-500)]">tonnes</p>
                     </article>
                   </div>
+
+                  <div className="mt-3">
+                    <button
+                      type="button"
+                      onClick={explainPrediction}
+                      disabled={!result || isLoadingExplanation}
+                      className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold text-[var(--ink-900)] transition hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isLoadingExplanation ? "Analyse IA en cours..." : "Expliquer les resultats (IA)"}
+                    </button>
+                  </div>
+
+                  {explanation && (
+                    <article className="mt-3 rounded-xl border border-[var(--line)] bg-white p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[var(--ink-500)]">
+                        Interpretation IA
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--ink-700)]">
+                        {explanation}
+                      </p>
+                    </article>
+                  )}
 
                   <details className="mt-4 rounded-xl border border-[var(--line)] bg-white p-3">
                     <summary className="cursor-pointer text-sm font-semibold text-[var(--ink-900)]">
