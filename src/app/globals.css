@@ -36,17 +36,6 @@ body {
   position: relative;
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px);
-  background-size: 100% 38px;
-  opacity: 0.2;
-  z-index: -1;
-}
-
 ::selection {
   background: rgba(0, 117, 104, 0.2);
 }
@@ -83,22 +72,23 @@ body::before {
   background: rgba(0, 117, 104, 0.1);
 }
 
-.chip-neutral {
+.status-badge {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #ffffff;
-  padding: 0.3rem 0.55rem;
+  padding: 0.28rem 0.62rem;
   color: var(--ink-700);
   font-weight: 600;
+  font-size: 0.75rem;
 }
 
-.chip-good {
+.status-good {
   border: 1px solid rgba(22, 115, 59, 0.3);
   background: rgba(22, 115, 59, 0.15);
   color: var(--good);
 }
 
-.chip-warn {
+.status-warn {
   border: 1px solid rgba(182, 90, 47, 0.34);
   background: rgba(182, 90, 47, 0.14);
   color: var(--warn);
@@ -135,17 +125,6 @@ body::before {
 
 .section-reveal {
   animation: none;
-}
-
-@keyframes riseIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 textarea,
